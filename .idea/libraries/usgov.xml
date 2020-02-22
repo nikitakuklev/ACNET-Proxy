@@ -1,9 +1,0 @@
-<component name="libraryTable">
-  <library name="usgov">
-    <CLASSES>
-      <root url="jar://$PROJECT_DIR$/libs/usgov.jar!/" />
-    </CLASSES>
-    <JAVADOC />
-    <SOURCES />
-  </library>
-</component>
