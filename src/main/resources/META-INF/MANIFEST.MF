@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Main-Class: Adapter
+Class-Path: jackson-core-2.9.4.jar slf4j-api-1.7.26.jar jackson-databind
+ -2.9.4.jar usgov.jar jconn3.jar xerces.jar gson-2.8.6.jar amqp-client-5
+ .7.3.jar usgov.jar jackson-annotations-2.9.0.jar dsl-json-java8-1.9.3.j
+ ar dsl-json-1.9.3.jar
+
