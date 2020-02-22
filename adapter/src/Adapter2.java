@@ -39,9 +39,9 @@ public class Adapter2 {
     public static DaqClient daqClient = null;
 
     public static void main(String[] args) {
-        //System.setProperty("dmq.heartbeat-rate", "500");
-        //System.setProperty("dmq.amqp-heartbeat-rate", "500");
-        //System.setProperty("dmq.max-idle-time", "10500");
+        System.setProperty("dmq.heartbeat-rate", "500");
+        System.setProperty("dmq.amqp-heartbeat-rate", "500");
+        System.setProperty("dmq.max-idle-time", "10500");
 
         Handler handlerObj = new ConsoleHandler();
         handlerObj.setFormatter(new LogFormatter());
@@ -122,8 +122,8 @@ public class Adapter2 {
             //startDaqJob(stringList, "devices", 50000);
             //startDaqJob(s2, "bpms", 1000);
             for (String dev : s2) {
-                startDaqJob(new ArrayList<String>(Arrays.asList(dev)), "bpms", 10);
-                Thread.sleep(1111);
+                startDaqJob(new ArrayList<String>(Arrays.asList(dev)), "bpms" + dev, 100);
+                Thread.sleep(1000);
             }
 
             logger.info("Setting up HTTP relay");
@@ -162,7 +162,6 @@ public class Adapter2 {
         if (v instanceof TimedDouble) {
             return Double.toString(v.doubleValue());
         } else if (v instanceof TimedDoubleArray) {
-            //return Arrays.toString(((TimedDoubleArray) v).doubleArray());
             double[] doubleArray = ((TimedDoubleArray) v).doubleArray();
             ByteBuffer buf = ByteBuffer.allocate(Double.SIZE / Byte.SIZE * doubleArray.length);
             buf.asDoubleBuffer().put(doubleArray);
@@ -316,12 +315,16 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                 }
                 obj_map.put(requestDRF, data);
             } else if (requestType.equalsIgnoreCase("V1_DRF2_SET_SINGLE")) {
-                DIODMQ.enableSettings(true, 1);
-                System.out.println(DIODMQ.isSettingEnabled());
                 obj_map = new HashMap<>(1);
                 long startTime = System.nanoTime();
-                data = DIODMQ.setDevice(requestDRF,  Double.parseDouble(r.requestValue));
-                System.out.println(data);
+                try {
+                    double val = Double.parseDouble(r.requestValue);
+                    data = DIODMQ.setDevice(requestDRF,  val);
+                } catch (NumberFormatException e) {
+                    data = DIODMQ.setDevice(requestDRF,  r.requestValue);
+                }
+
+                //System.out.println(data);
                 //data = DIODMQ.readDevice(requestDRF);
                 long endTime = System.nanoTime();
                 long duration = (endTime - startTime);
@@ -332,6 +335,7 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                     return;
                 }
                 obj_map.put(requestDRF, data);
+
             } else {
                 abort("INVALID REQUEST TYPE", exchange);
                 return;
