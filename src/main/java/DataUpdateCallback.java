@@ -35,14 +35,18 @@ class DataUpdateCallback extends TimedNumberCallback {
             num_errors++;
             if (var1 != null) {
                 errors.put(var1, errors.get(var1) + 1);
-            } else {
+            }
+            else {
                 System.out.println("NULL Callback:" + var2);
+                return;
             }
             int error = ((TimedError) var2).getErrorNumber();
+            int fc = ((TimedError) var2).getFacilityCode();
+            //if ((fc==57) && (error==-107)) {return;} //MOOC_READ_TIMEOUT
             if ((error == -89) || (error == -107) || (error == 1) || (error == 3)) {
-                return; // These are common errors
+               // return; // These are common errors
             }
-            System.out.println(((TimedError) var2).getErrorNumber() + " | " + var2 + " | " + var1);
+            System.out.println("Weird error: E:" + error + " | FC:" + fc + " | "+ var2 + " | " + var1);
         }
         results.put(var1, var2);
     }

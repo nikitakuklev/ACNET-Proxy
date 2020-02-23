@@ -5,8 +5,6 @@ import gov.fnal.controls.tools.logging.LogFormatter;
 import gov.fnal.controls.tools.logging.LogInit;
 import gov.fnal.controls.tools.timed.*;
 import io.undertow.Undertow;
-import io.undertow.server.handlers.AllowedMethodsHandler;
-import io.undertow.util.HttpString;
 
 import java.io.*;
 import java.net.URL;
@@ -66,7 +64,7 @@ public class Adapter2 {
             }
             Path filePath = new File(resource.getFile()).toPath();
             List<String> s1 = Files.readAllLines(filePath, charset).stream()
-                    .map(s -> s.split("@")[0] + "@p,200").collect(Collectors.toList());
+                    .map(s -> s.split("@")[0] + "@q,500").collect(Collectors.toList());
             HashSet<String> devices = new HashSet<>(s1);
 
             URL resource2 = classLoader.getResource("bpms.txt");
@@ -171,7 +169,8 @@ public class Adapter2 {
     private static void setupUndertowRelay() {
         Undertow.Builder server = Undertow.builder();
         server.addHttpListener(8080, "localhost");
-        server.setHandler(new AllowedMethodsHandler(new UndertowPOSTHandler(), new HttpString("POST")));
+        //server.setHandler(new AllowedMethodsHandler(new UndertowPOSTHandler(), new HttpString("POST")));
+        server.setHandler(new UndertowPOSTHandler());
         server.build().start();
     }
 

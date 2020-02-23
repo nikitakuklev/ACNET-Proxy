@@ -1,8 +1,10 @@
 import com.fasterxml.jackson.databind.ObjectMapper;
+import gov.fnal.controls.service.proto.DAQData;
 import gov.fnal.controls.tools.dio.DIODMQ;
 import gov.fnal.controls.tools.timed.*;
 import io.undertow.server.HttpServerExchange;
 import io.undertow.util.Headers;
+import io.undertow.util.HttpString;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -13,6 +15,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
 
@@ -24,6 +30,10 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
 
     @Override
     public void handleRequest(final HttpServerExchange exchange) throws Exception {
+        if (!exchange.getRequestPath().equals("")) {
+            abort("Wrong path!", exchange);
+            return;
+        }
         long t0 = System.nanoTime();
         if (exchange.isInIoThread()) {
             exchange.dispatch(this);
@@ -42,6 +52,24 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
             result.write(buffer, 0, length);
         }
         String message = result.toString(StandardCharsets.UTF_8.name());
+
+        if (exchange.getRequestMethod().equals(new HttpString("GET"))) {
+            try {
+                System.out.println("GET request - returning debug info");
+                String response = objectMapper.writeValueAsString(Adapter2.callbacks.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().errors)));
+                exchange.getResponseHeaders().put(Headers.CONTENT_TYPE, "application/json");
+                exchange.setStatusCode(200);
+                exchange.getResponseSender().send(response);
+            } catch (Exception e) {
+                e.printStackTrace();
+                abort("INTERNAL SERIALIZATION FAILURE: " + e.getMessage(), exchange);
+                System.exit(1);
+            } finally {
+                System.out.println(String.format("Total time (ms): %f | Length: ?", (System.nanoTime() - t0) / 1e6));
+                exchange.endExchange();
+                return;
+            }
+        }
 
         long t2 = System.nanoTime();
         System.out.println(">Request read:" + message + ' ' + (t2-t1)/1e3);
@@ -67,7 +95,7 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                 (t3-t2)/1e3,requestType,requestDRF));
         if (!checkRequest(requestDRF)) {abort("INVALID REQUEST - REJECTED BY SANITY CHECKS", exchange);};
 
-        TimedNumber data;
+        TimedNumber data = null;
         HashMap<String, TimedNumber> obj_map;
         long t4 = 0;
         try {
@@ -99,8 +127,7 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                 obj_map = new HashMap<>(1);
                 long startTime = System.nanoTime();
                 data = DIODMQ.readDevice(requestDRF);
-                long endTime = System.nanoTime();
-                long duration = (endTime - startTime);
+                long duration = (System.nanoTime() - startTime);
                 System.out.println(String.format(">(%s) complete! (%.4f ms)", requestType, duration / 1e6));
 
                 if (data == null) {
@@ -109,21 +136,25 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                 }
                 obj_map.put(requestDRF, data);
             } else if (requestType.equalsIgnoreCase("V1_DRF2_SET_SINGLE")) {
+                // This method should work for all relevant settings, since we can use
+                // canonical DRF2 (i.e. STATUS.ON) for most things. Only restriction is reserved status keywords.
                 obj_map = new HashMap<>(1);
                 long startTime = System.nanoTime();
-                try {
-                    double val = Double.parseDouble(r.requestValue);
-                    data = DIODMQ.setDevice(requestDRF,  val);
-                } catch (NumberFormatException e) {
-                    data = DIODMQ.setDevice(requestDRF,  r.requestValue);
+                for (DAQData.BasicControl b : DAQData.BasicControl.values()) {
+                    if (b.name().equalsIgnoreCase(r.requestValue)) {
+                        data = DIODMQ.setDevice(requestDRF,  b);
+                    }
                 }
-
-                //System.out.println(data);
-                //data = DIODMQ.readDevice(requestDRF);
-                long endTime = System.nanoTime();
-                long duration = (endTime - startTime);
+                if (data == null) {
+                    try {
+                        double val = Double.parseDouble(r.requestValue);
+                        data = DIODMQ.setDevice(requestDRF, val);
+                    } catch (NumberFormatException e) {
+                        data = DIODMQ.setDevice(requestDRF, r.requestValue);
+                    }
+                }
+                long duration = (System.nanoTime() - startTime);
                 System.out.println(String.format(">(%s) complete! (%.4f ms)", requestType, duration / 1e6));
-
                 if (data == null) {
                     abort("INVALID REQUEST - REJECTED BY ACNET", exchange);
                     return;
@@ -177,6 +208,8 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
             buf.asDoubleBuffer().put(doubleArray);
             return Base64.getEncoder().encodeToString(buf.array());
         } else if (v instanceof TimedBasicStatus) {
+            return v.toString();
+        } else if (v instanceof TimedBoolean) {
             return v.toString();
         } else if (v instanceof TimedError) {
             return v.toString();
