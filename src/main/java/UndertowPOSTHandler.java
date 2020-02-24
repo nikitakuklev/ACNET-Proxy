@@ -30,16 +30,15 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
 
     @Override
     public void handleRequest(final HttpServerExchange exchange) throws Exception {
-        if (!exchange.getRequestPath().equals("")) {
-            abort("Wrong path!", exchange);
-            return;
-        }
         long t0 = System.nanoTime();
         if (exchange.isInIoThread()) {
             exchange.dispatch(this);
             return;
         }
-
+        if (!exchange.getRequestPath().equals("/")) {
+            abort("Wrong path!", exchange);
+            return;
+        }
         long t1 = System.nanoTime();
         System.out.println(">In blocking thread:" + (t1-t0)/1e3);
 
@@ -67,8 +66,9 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
             } finally {
                 System.out.println(String.format("Total time (ms): %f | Length: ?", (System.nanoTime() - t0) / 1e6));
                 exchange.endExchange();
-                return;
+
             }
+            return;
         }
 
         long t2 = System.nanoTime();
@@ -137,7 +137,7 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                 obj_map.put(requestDRF, data);
             } else if (requestType.equalsIgnoreCase("V1_DRF2_SET_SINGLE")) {
                 // This method should work for all relevant settings, since we can use
-                // canonical DRF2 (i.e. STATUS.ON) for most things. Only restriction is reserved status keywords.
+                // canonical DRF2 (i.e. STATUS.ON). Only restriction is reserved status keywords.
                 obj_map = new HashMap<>(1);
                 long startTime = System.nanoTime();
                 for (DAQData.BasicControl b : DAQData.BasicControl.values()) {
