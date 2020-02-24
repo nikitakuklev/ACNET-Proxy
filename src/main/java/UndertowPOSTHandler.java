@@ -142,13 +142,22 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                 long startTime = System.nanoTime();
                 for (DAQData.BasicControl b : DAQData.BasicControl.values()) {
                     if (b.name().equalsIgnoreCase(r.requestValue)) {
+                        TimedBasicControl timed = new TimedBasicControl(b);
+                        DAQData.Reply reply = TimedNumberFactory.toProto(timed);
                         data = DIODMQ.setDevice(requestDRF,  b);
                     }
                 }
+
+
+
                 if (data == null) {
                     try {
                         double val = Double.parseDouble(r.requestValue);
-                        data = DIODMQ.setDevice(requestDRF, val);
+                        TimedDouble td = new TimedDouble(val);
+                        DAQData.Reply reply = TimedNumberFactory.toProto(td);
+                        Adapter2.settingJob.setData(requestDRF,reply);
+                        //Adapter2.settingJob.addDataCallback();
+                        //data = DIODMQ.setDevice(requestDRF, val);
                     } catch (NumberFormatException e) {
                         data = DIODMQ.setDevice(requestDRF, r.requestValue);
                     }

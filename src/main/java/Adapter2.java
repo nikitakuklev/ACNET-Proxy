@@ -32,6 +32,7 @@ public class Adapter2 {
     private static final Logger logger = Logger.getLogger(Adapter2.class.getName());
     public static DaqClient daqReadingClient = null;
     public static DaqClient daqSettingClient = null;
+    public static SettingJob settingJob = null;
     public static ConcurrentHashMap<String, DataUpdateCallback> callbacks = new ConcurrentHashMap<>();
 
     public static void main(String[] args) {
@@ -96,7 +97,7 @@ public class Adapter2 {
 //                Thread.sleep(1000);
 //            }
 
-            startSettingDaqJob();
+            startSettingDaqJob(s1);
 
             logger.info("Setting up HTTP relay");
             setupUndertowRelay();
@@ -157,11 +158,13 @@ public class Adapter2 {
         logger.info("Authorized as:" + daqReadingClient);
     }
 
-    private static void startSettingDaqJob() {
+    private static void startSettingDaqJob(List<String> devices) {
         daqSettingClient = new DaqClient();
         daqSettingClient.setCredentialHandler(new DefaultCredentialHandler());
-        DIODMQ.setDaqClient(daqSettingClient);
         daqSettingClient.enableSetting(SettingsState.FOREVER, TimeUnit.MINUTES);
+        settingJob = daqSettingClient.createSettingJob(new HashSet<>(devices));
+        //DIODMQSettingJob test = new DIODMQSettingJob(daqSettingClient, "test");
+        DIODMQ.setDaqClient(daqSettingClient);
         DIODMQ.enableSettings(true, SettingsState.FOREVER);
         logger.info("Client created, setting enabled: " + daqSettingClient.isSettingEnabled());
     }
