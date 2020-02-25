@@ -34,6 +34,7 @@ public class Adapter2 {
     public static DaqClient daqSettingClient = null;
     public static SettingJob settingJob = null;
     public static ConcurrentHashMap<String, DataUpdateCallback> callbacks = new ConcurrentHashMap<>();
+    public static HashSet<String> bpms = null;
 
     public static void main(String[] args) {
         System.setProperty("dmq.heartbeat-rate", "500");
@@ -77,7 +78,7 @@ public class Adapter2 {
                     //.map(s -> {if (s.contains("@")) {return s;} else {return s + "@p,1000";}})
                     .map(s -> s.split("@")[0]+ "@p,5000")
                     .filter(s -> s.charAt(7) == 'V').collect(Collectors.toList());
-            HashSet<String> bpms = new HashSet<>(s2);
+            bpms = new HashSet<>(s2);
 
             int total_size = devices.size()+bpms.size();
             DRFCache.CACHE = new ConcurrentHashMap<>(total_size);

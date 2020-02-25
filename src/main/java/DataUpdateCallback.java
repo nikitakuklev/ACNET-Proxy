@@ -42,7 +42,17 @@ class DataUpdateCallback extends TimedNumberCallback {
             }
             int error = ((TimedError) var2).getErrorNumber();
             int fc = ((TimedError) var2).getFacilityCode();
-            //if ((fc==57) && (error==-107)) {return;} //MOOC_READ_TIMEOUT
+            if (Adapter2.bpms.contains(var1)) {
+                if ((fc == 57) && (error == -107)) {
+                    return;
+                } //MOOC_READ_TIMEOUT
+                if ((fc == 57) && (error == -111)) {
+                    return;
+                } //MOOC_DRIVER_FAILED
+                if ((fc == 68) && (error == 3)) {
+                    return;
+                } //BPM_DATA_UNAVAILABLE
+            }
             if ((error == -89) || (error == -107) || (error == 1) || (error == 3)) {
                // return; // These are common errors
             }
