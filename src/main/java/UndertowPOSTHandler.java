@@ -148,8 +148,6 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                     }
                 }
 
-
-
                 if (data == null) {
                     try {
                         double val = Double.parseDouble(r.requestValue);
