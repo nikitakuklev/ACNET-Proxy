@@ -14,10 +14,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import java.util.logging.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -41,14 +38,19 @@ public class Adapter2 {
         System.setProperty("dmq.amqp-heartbeat-rate", "500");
         System.setProperty("dmq.max-idle-time", "10500");
 
-        Handler handlerObj = new ConsoleHandler();
-        handlerObj.setFormatter(new LogFormatter());
+        //LogInit.initializeLogs(); // debugs
+//        Logger master = Logger.getLogger("");
+//        for (Handler h : master.getHandlers()) {
+//            if (h instanceof FileHandler) {
+//                master.removeHandler(h);
+//            }
+//        }
+        LogManager.getLogManager().reset();
+        StreamHandler handlerObj = new StreamHandler(System.out, new LogFormatter());
         handlerObj.setLevel(Level.ALL);
         logger.addHandler(handlerObj);
         logger.setUseParentHandlers(false);
         logger.log(Level.INFO, "ACNET2Py relay starting up");
-        LogInit.initializeLogs();
-
         logger.info("TEMP: " + System.getProperty("java.io.tmpdir"));
         logger.info("CWD: " + System.getProperty("user.dir"));
 
@@ -66,7 +68,7 @@ public class Adapter2 {
             }
             Path filePath = new File(resource.getFile()).toPath();
             List<String> s1 = Files.readAllLines(filePath, charset).stream()
-                    .map(s -> s.split("@")[0] + "@q,500").collect(Collectors.toList());
+                    .map(s -> s.split("@")[0] + "@q,100").collect(Collectors.toList());
             HashSet<String> devices = new HashSet<>(s1);
 
             URL resource2 = classLoader.getResource("bpms.txt");

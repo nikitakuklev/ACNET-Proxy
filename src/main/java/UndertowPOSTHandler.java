@@ -18,11 +18,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
+public class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
 
     ObjectMapper objectMapper;
+    private static final Logger logger = Logger.getLogger(Adapter2.class.getName());
 
     public UndertowPOSTHandler() {
         objectMapper = new ObjectMapper();
@@ -40,7 +42,7 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
             return;
         }
         long t1 = System.nanoTime();
-        System.out.println(">In blocking thread:" + (t1-t0)/1e3);
+        logger.fine(">In blocking thread:" + (t1-t0)/1e3);
 
         exchange.startBlocking();
         InputStream is = exchange.getInputStream();
@@ -99,9 +101,8 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
         HashMap<String, TimedNumber> obj_map;
         long t4 = 0;
         try {
-            if (requestType.equalsIgnoreCase("V1_DRF2_READ_MULTI_CACHED") ||
-                    requestType.equalsIgnoreCase("V1_DRF2_READ_SINGLE_CACHED") ||
-                    requestType.equalsIgnoreCase("V1_DRF2_READ_CACHED")) {
+            if (requestType.equalsIgnoreCase("V1_DRF2_READ_MULTI_CACHED")) {
+                // This type returns latest value in cache, if any
                 String[] requests = requestDRF.split(";");
                 obj_map = new HashMap<>(requests.length);
                 for (String req : requests) {
@@ -115,7 +116,7 @@ class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                         r.response = a;
                     }
                     if (data == null) {
-                        System.out.println(DRFCache.CACHE.keySet());
+                        //System.out.println(DRFCache.CACHE.keySet());
                         abort(String.format("INVALID REQUEST - DEVICE %s NOT IN CACHE",req), exchange);
                         return;
                     } else {
