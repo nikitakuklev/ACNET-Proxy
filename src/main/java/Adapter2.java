@@ -45,7 +45,7 @@ public class Adapter2 {
 //                master.removeHandler(h);
 //            }
 //        }
-        LogManager.getLogManager().reset();
+        //LogManager.getLogManager().reset();
         StreamHandler handlerObj = new StreamHandler(System.out, new LogFormatter());
         handlerObj.setLevel(Level.ALL);
         logger.addHandler(handlerObj);
