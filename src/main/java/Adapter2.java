@@ -68,7 +68,7 @@ public class Adapter2 {
             }
             Path filePath = new File(resource.getFile()).toPath();
             List<String> s1 = Files.readAllLines(filePath, charset).stream()
-                    .map(s -> s.split("@")[0] + "@q,100").collect(Collectors.toList());
+                    .map(s -> s.split("@")[0] + "@q,500").collect(Collectors.toList());
             HashSet<String> devices = new HashSet<>(s1);
 
             URL resource2 = classLoader.getResource("bpms.txt");
@@ -94,7 +94,7 @@ public class Adapter2 {
 
             logger.info(String.format("Starting cache jobs with %d entries", total_size));
             startReadingDaqJob(s1, "devices", 50000);
-            startReadingDaqJob(s2, "bpms", 100);
+            //startReadingDaqJob(s2, "bpms", 100);
 //            for (String dev : s2) {
 //                startReadingDaqJob(new ArrayList<String>(Arrays.asList(dev)), "bpms" + dev, 100);
 //                Thread.sleep(1000);
