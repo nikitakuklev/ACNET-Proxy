@@ -13,20 +13,18 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-public class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
+public class UndertowHandler implements io.undertow.server.HttpHandler {
 
     ObjectMapper objectMapper;
     private static final Logger logger = Logger.getLogger(Adapter2.class.getName());
 
-    public UndertowPOSTHandler() {
+    public UndertowHandler() {
         objectMapper = new ObjectMapper();
     }
 
@@ -42,7 +40,7 @@ public class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
             return;
         }
         long t1 = System.nanoTime();
-        logger.fine(">In blocking thread:" + (t1-t0)/1e3);
+        //logger.fine(">In blocking thread:" + (t1-t0)/1e3);
 
         exchange.startBlocking();
         InputStream is = exchange.getInputStream();
@@ -74,7 +72,7 @@ public class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
         }
 
         long t2 = System.nanoTime();
-        System.out.println(">Request read:" + message + ' ' + (t2-t1)/1e3);
+        //System.out.println(">Request read:" + message + ' ' + (t2-t1)/1e3);
 
         Message r;
         try {
@@ -93,8 +91,8 @@ public class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
         }
         //checkRequest(requestDRF);
         long t3 = System.nanoTime();
-        System.out.println(String.format("> %f - Request parsed: %s %s ",
-                (t3-t2)/1e3,requestType,requestDRF));
+        //System.out.println(String.format("> %f - Request parsed: %s %s ", (t3-t2)/1e3,requestType,requestDRF));
+
         if (!checkRequest(requestDRF)) {abort("INVALID REQUEST - REJECTED BY SANITY CHECKS", exchange);};
 
         TimedNumber data = null;
@@ -125,50 +123,131 @@ public class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
                 }
                 //System.out.println(String.format("> Complete! (WITH CACHE)"));
             } else if (requestType.equalsIgnoreCase("V1_DRF2_READ_SINGLE")) {
-                obj_map = new HashMap<>(1);
-                long startTime = System.nanoTime();
-                data = DIODMQ.readDevice(requestDRF);
-                long duration = (System.nanoTime() - startTime);
-                System.out.println(String.format(">(%s) complete! (%.4f ms)", requestType, duration / 1e6));
-
-                if (data == null) {
-                    abort("INVALID REQUEST - REJECTED BY ACNET", exchange);
-                    return;
+                // This type returns latest value in cache, if any
+                String[] requests = requestDRF.split(";");
+                obj_map = new HashMap<>(requests.length);
+                HashMap<String, TimedNumber> results = DIODMQ.readDeviceList(requests);
+                for (Map.Entry<String,TimedNumber> entry : results.entrySet()) {
+                    data = entry.getValue();
+                    if (data == null) {
+                        abort(String.format("INVALID REQUEST - %s REJECTED BY ACNET",entry.getKey()), exchange);
+                        return;
+                    } else {
+                        obj_map.put(entry.getKey(), data);
+                    }
                 }
-                obj_map.put(requestDRF, data);
+                //System.out.println(String.format("> Complete! (WITH CACHE)"));
+//                obj_map = new HashMap<>(1);
+//                long startTime = System.nanoTime();
+//                data = DIODMQ.readDevice(requestDRF);
+//                long duration = (System.nanoTime() - startTime);
+//                //System.out.println(String.format(">(%s) complete! (%.4f ms)", requestType, duration / 1e6));
+//
+//                if (data == null) {
+//                    abort("INVALID REQUEST - REJECTED BY ACNET", exchange);
+//                    return;
+//                }
+//                obj_map.put(requestDRF, data);
             } else if (requestType.equalsIgnoreCase("V1_DRF2_SET_SINGLE")) {
                 // This method should work for all relevant settings, since we can use
                 // canonical DRF2 (i.e. STATUS.ON). Only restriction is reserved status keywords.
+                String requestDRFlocal = null;//requestDRF;
+                if (requestDRF.contains(".")) {
+                    requestDRFlocal = requestDRF.split("\\.")[0];
+                    //System.out.println(String.format("Reading %s formatted: %s", requestDRF, requestDRFlocal));
+                }
                 obj_map = new HashMap<>(1);
                 long startTime = System.nanoTime();
+                boolean null_override = false;
                 for (DAQData.BasicControl b : DAQData.BasicControl.values()) {
                     if (b.name().equalsIgnoreCase(r.requestValue)) {
                         TimedBasicControl timed = new TimedBasicControl(b);
                         DAQData.Reply reply = TimedNumberFactory.toProto(timed);
-                        data = DIODMQ.setDevice(requestDRF,  b);
+                        if (Adapter2.setters.contains(requestDRF)) {
+                            System.out.println(String.format("CACHED status setting %s",requestDRF));
+                            Adapter2.settingJob.setData(requestDRF, reply);
+                            data = ((SettingCallback)Adapter2.settingCallback).getData();
+                        } else {
+                            data = DIODMQ.setDevice(requestDRF,  b);
+                        }
                     }
                 }
 
                 if (data == null) {
                     try {
                         double val = Double.parseDouble(r.requestValue);
-                        //TimedDouble td = new TimedDouble(val);
-                        //DAQData.Reply reply = TimedNumberFactory.toProto(td);
-                        //Adapter2.settingJob.setData(requestDRF,reply);
-                        //Adapter2.settingJob.addDataCallback();
-                        data = DIODMQ.setDevice(requestDRF, val);
+                        if (Adapter2.setters.contains(requestDRF)) {
+                            System.out.println(String.format("CACHED double setting %s",requestDRF));
+                            TimedDouble td = new TimedDouble(val);
+                            DAQData.Reply reply = TimedNumberFactory.toProto(td);
+                            Adapter2.settingJob.setData(requestDRF, reply);
+                            data = ((SettingCallback)Adapter2.settingCallback).getData();
+                        } else {
+                            data = DIODMQ.setDevice(requestDRF, val);
+                        }
                     } catch (NumberFormatException e) {
                         data = DIODMQ.setDevice(requestDRF, r.requestValue);
                     }
                 }
-                long duration = (System.nanoTime() - startTime);
-                System.out.println(String.format(">(%s) complete! (%.4f ms)", requestType, duration / 1e6));
-                if (data == null) {
+                //long duration = (System.nanoTime() - startTime);
+                //System.out.println(String.format(">(%s) complete! (%.4f ms) (%s)", requestType, duration / 1e6, requestDRF));
+                if (data == null && !null_override) {
                     abort("INVALID REQUEST - REJECTED BY ACNET", exchange);
                     return;
                 }
                 obj_map.put(requestDRF, data);
 
+            } else if (requestType.equalsIgnoreCase("V1_DRF2_SET_MULTI")) {
+                String[] requests = requestDRF.split(";");
+                String[] values = r.requestValue.split(";");
+                //DAQData.BasicControl[] basics = Arrays.stream(DAQData.BasicControl.values()).;
+
+                obj_map = new HashMap<>(requests.length);
+                for (int i=0; i<requests.length; i++) {
+                    data = null;
+                    String req = requests[i];
+                    String value = values[i];
+                    long startTime = System.nanoTime();
+                    try {
+                        double val = Double.parseDouble(value);
+                        if (Adapter2.setters.contains(req)) {
+                            //System.out.println(String.format("CACHED double setting %s",req));
+                            TimedDouble td = new TimedDouble(val);
+                            DAQData.Reply reply = TimedNumberFactory.toProto(td);
+                            Adapter2.settingJob.setData(req, reply);
+                            data = ((SettingCallback)Adapter2.settingCallback).getData();
+                        } else {
+                            System.out.println(String.format("NONCH double setting %s",req));
+                            data = DIODMQ.setDevice(req, val);
+                        }
+                    } catch (NumberFormatException e) {
+//                        for (DAQData.BasicControl b : DAQData.BasicControl.values()) {
+//                            if (b.name().equalsIgnoreCase(value)) {
+//                                TimedBasicControl timed = new TimedBasicControl(b);
+//                                DAQData.Reply reply = TimedNumberFactory.toProto(timed);
+//                                if (Adapter2.setters.contains(req)) {
+//                                    System.out.println(String.format("CACHED status setting %s",req));
+//                                    Adapter2.settingJob.setData(req, reply);
+//                                    data = ((SettingCallback)Adapter2.settingCallback).getData();
+//                                } else {
+//                                    System.out.println(String.format("NONCH status setting %s",req));
+//                                    data = DIODMQ.setDevice(req,  b);
+//                                }
+//                                break;
+//                            }
+//                        }
+                        System.out.println(String.format("NONCH string setting %s",req));
+                        data = DIODMQ.setDevice(req, value);
+                    }
+                    if (data == null) {
+                        abort("INVALID REQUEST - REJECTED BY ACNET", exchange);
+                        return;
+                    }
+                    long duration = (System.nanoTime() - startTime);
+                    System.out.println(String.format(">Set device %d/%d! (%.4f ms)", i+1, requests.length, duration / 1e6));
+                    obj_map.put(req, data);
+                    Thread.sleep(3);
+                }
             } else {
                 abort("INVALID REQUEST TYPE", exchange);
                 return;
@@ -176,19 +255,19 @@ public class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
             r.responseTime = Instant.now().toString();
 
             t4 = System.nanoTime();
-            System.out.println(">Request processed:" + (t4-t3)/1e3);
+            //System.out.println(">Request processed:" + (t4-t3)/1e3);
 
             HashMap<String, String> map = new HashMap<>(obj_map.size());
             obj_map.forEach((k, v) -> map.put(k, convertTimedNumber(v)));
             r.responseJson = map;
         } catch (Exception e) {
             e.printStackTrace();
-            abort("INTERNAL FAILURE: " + e.getMessage(), exchange);
+            abort(requestDRF + " - INTERNAL FAILURE: " + e.getMessage(), exchange);
             System.exit(1);
         }
 
         long t5 = System.nanoTime();
-        System.out.println(">Request serialized:" + (t5-t4)/1e3);
+        //System.out.println(">Request serialized:" + (t5-t4)/1e3);
 
         try {
             //System.out.println("Writing json");
@@ -202,7 +281,8 @@ public class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
             abort("INTERNAL SERIALIZATION FAILURE: " + e.getMessage(), exchange);
             System.exit(1);
         } finally {
-            System.out.println(String.format("Total time (ms): %f | Length: ?", (System.nanoTime() - t0) / 1e6));
+            System.out.println(String.format("Req (%s) - (tot|proc) (%.4f|%.4f), drf: %s, %s",
+                    requestType, (System.nanoTime() - t0) / 1e6, (t4-t3)/1e6, requestDRF, r.requestValue));
             exchange.endExchange();
         }
     }
@@ -239,6 +319,5 @@ public class UndertowPOSTHandler implements io.undertow.server.HttpHandler {
         exchange.setStatusCode(403);
         exchange.getResponseSender().send(response);
         exchange.endExchange();
-        return;
     }
 }

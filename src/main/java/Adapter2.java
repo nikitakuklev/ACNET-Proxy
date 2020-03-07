@@ -30,15 +30,17 @@ public class Adapter2 {
     public static DaqClient daqReadingClient = null;
     public static DaqClient daqSettingClient = null;
     public static SettingJob settingJob = null;
+    public static TimedNumberCallback settingCallback = null;
     public static ConcurrentHashMap<String, DataUpdateCallback> callbacks = new ConcurrentHashMap<>();
     public static HashSet<String> bpms = null;
+    public static HashSet<String> setters = null;
 
     public static void main(String[] args) {
-        System.setProperty("dmq.heartbeat-rate", "500");
-        System.setProperty("dmq.amqp-heartbeat-rate", "500");
-        System.setProperty("dmq.max-idle-time", "10500");
+        System.setProperty("dmq.heartbeat-rate", "1000");
+        System.setProperty("dmq.amqp-heartbeat-rate", "1000");
+        System.setProperty("dmq.max-idle-time", "15000");
 
-        //LogInit.initializeLogs(); // debugs
+        LogInit.initializeLogs(); // debugs
 //        Logger master = Logger.getLogger("");
 //        for (Handler h : master.getHandlers()) {
 //            if (h instanceof FileHandler) {
@@ -46,10 +48,10 @@ public class Adapter2 {
 //            }
 //        }
         //LogManager.getLogManager().reset();
-        StreamHandler handlerObj = new StreamHandler(System.out, new LogFormatter());
-        handlerObj.setLevel(Level.ALL);
-        logger.addHandler(handlerObj);
-        logger.setUseParentHandlers(false);
+        //StreamHandler handlerObj = new StreamHandler(System.out, new LogFormatter());
+        //handlerObj.setLevel(Level.ALL);
+        //logger.addHandler(handlerObj);
+        logger.setUseParentHandlers(true);
         logger.log(Level.INFO, "ACNET2Py relay starting up");
         logger.info("TEMP: " + System.getProperty("java.io.tmpdir"));
         logger.info("CWD: " + System.getProperty("user.dir"));
@@ -68,7 +70,7 @@ public class Adapter2 {
             }
             Path filePath = new File(resource.getFile()).toPath();
             List<String> s1 = Files.readAllLines(filePath, charset).stream()
-                    .map(s -> s.split("@")[0] + "@q,500").collect(Collectors.toList());
+                    .map(s -> s.split("@")[0] + "@p,1000").collect(Collectors.toList());
             HashSet<String> devices = new HashSet<>(s1);
 
             URL resource2 = classLoader.getResource("bpms.txt");
@@ -82,6 +84,14 @@ public class Adapter2 {
                     .filter(s -> s.charAt(7) == 'V').collect(Collectors.toList());
             bpms = new HashSet<>(s2);
 
+            URL resource3 = classLoader.getResource("setting_devices.txt");
+            if (resource3 == null) {
+                throw new IllegalArgumentException("Devices not found!");
+            }
+            Path filePath3 = new File(resource3.getFile()).toPath();
+            List<String> s3 = new ArrayList<>(Files.readAllLines(filePath3, charset));
+            setters = new HashSet<>(s3);
+
             int total_size = devices.size()+bpms.size();
             DRFCache.CACHE = new ConcurrentHashMap<>(total_size);
             DRFCache.NAMEMAP = new ConcurrentHashMap<>(total_size);
@@ -93,14 +103,13 @@ public class Adapter2 {
                     });
 
             logger.info(String.format("Starting cache jobs with %d entries", total_size));
-            startReadingDaqJob(s1, "devices", 50000);
+            //startReadingDaqJob(s1, "devices", 50000);
             //startReadingDaqJob(s2, "bpms", 100);
 //            for (String dev : s2) {
 //                startReadingDaqJob(new ArrayList<String>(Arrays.asList(dev)), "bpms" + dev, 100);
-//                Thread.sleep(1000);
+//                Thread.sleep(77);
 //            }
-
-            startSettingDaqJob(s1);
+            startSettingDaqJob(s3);
 
             logger.info("Setting up HTTP relay");
             setupUndertowRelay();
@@ -123,9 +132,10 @@ public class Adapter2 {
             TimedNumber temp = DIODMQ.readDevice("M:OUTTMP@I");
             logger.info(String.format("It is %f %s outside...yikes", temp.doubleValue(), temp.getUnit()));
             logger.info("Read test - OK");
-
+            Thread.sleep(1000);
             logger.info("Write test");
             DIODMQ.setDevice("Z_ACLTST", 5.5);
+            Thread.sleep(1000);
             TimedNumber data = DIODMQ.readDevice("Z:ACLTST@I");
             logger.info(String.format("Z:ACLTST readback 1: %s",data));
             DIODMQ.setDevice("Z_ACLTST", 5.6);
@@ -166,17 +176,25 @@ public class Adapter2 {
         daqSettingClient.setCredentialHandler(new DefaultCredentialHandler());
         daqSettingClient.enableSetting(SettingsState.FOREVER, TimeUnit.MINUTES);
         settingJob = daqSettingClient.createSettingJob(new HashSet<>(devices));
+        settingCallback = new SettingCallback();
+        settingJob.addDataCallback(settingCallback);
         //DIODMQSettingJob test = new DIODMQSettingJob(daqSettingClient, "test");
-        DIODMQ.setDaqClient(daqSettingClient);
+        DaqClient dc = new DaqClient();
+        dc.setCredentialHandler(new DefaultCredentialHandler());
+        DIODMQ.setDaqClient(dc);
         DIODMQ.enableSettings(true, SettingsState.FOREVER);
         logger.info("Client created, setting enabled: " + daqSettingClient.isSettingEnabled());
     }
 
     private static void setupUndertowRelay() {
         Undertow.Builder server = Undertow.builder();
+        server.setIoThreads(8);
+        server.setWorkerThreads(8*8);
+        server.setDirectBuffers(true);
+        server.setBufferSize(16364);
         server.addHttpListener(8080, "localhost");
         //server.setHandler(new AllowedMethodsHandler(new UndertowPOSTHandler(), new HttpString("POST")));
-        server.setHandler(new UndertowPOSTHandler());
+        server.setHandler(new UndertowHandler());
         server.build().start();
     }
 

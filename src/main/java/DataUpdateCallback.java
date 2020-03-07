@@ -1,7 +1,9 @@
 import gov.fnal.controls.service.dmq.TimedNumberCallback;
+import gov.fnal.controls.tools.timed.TimedDoubleArray;
 import gov.fnal.controls.tools.timed.TimedError;
 import gov.fnal.controls.tools.timed.TimedNumber;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,8 +30,13 @@ class DataUpdateCallback extends TimedNumberCallback {
         //System.out.println("Callback:" + var1 + "|" + var2);
         num_updates++;
         if (num_updates % this.freq == 0) {
-            System.out.println(String.format("%s | updates: %07d | errors: %05d | %s",
-                    this.name, num_updates, num_errors, var2));
+            if (var2 instanceof TimedDoubleArray){
+                System.out.println(String.format("%s | updates: %07d | errors: %05d | %s",
+                        this.name, num_updates, num_errors, Arrays.toString(Arrays.copyOfRange(((TimedDoubleArray) var2).doubleArray(), 0, 10))));
+            } else {
+                System.out.println(String.format("%s | updates: %07d | errors: %05d | %s",
+                        this.name, num_updates, num_errors, var2));
+            }
         }
         if (var2 instanceof TimedError) {
             num_errors++;
