@@ -164,7 +164,7 @@ public class UndertowHandler implements io.undertow.server.HttpHandler {
                         TimedBasicControl timed = new TimedBasicControl(b);
                         DAQData.Reply reply = TimedNumberFactory.toProto(timed);
                         if (Adapter2.setters.contains(requestDRF)) {
-                            System.out.println(String.format("CACHED status setting %s",requestDRF));
+                            //System.out.println(String.format("CACHED status setting %s",requestDRF));
                             Adapter2.settingJob.setData(requestDRF, reply);
                             data = ((SettingCallback)Adapter2.settingCallback).getData();
                         } else {
@@ -177,7 +177,7 @@ public class UndertowHandler implements io.undertow.server.HttpHandler {
                     try {
                         double val = Double.parseDouble(r.requestValue);
                         if (Adapter2.setters.contains(requestDRF)) {
-                            System.out.println(String.format("CACHED double setting %s",requestDRF));
+                            //System.out.println(String.format("CACHED double setting %s",requestDRF));
                             TimedDouble td = new TimedDouble(val);
                             DAQData.Reply reply = TimedNumberFactory.toProto(td);
                             Adapter2.settingJob.setData(requestDRF, reply);
@@ -246,7 +246,7 @@ public class UndertowHandler implements io.undertow.server.HttpHandler {
                     long duration = (System.nanoTime() - startTime);
                     System.out.println(String.format(">Set device %d/%d! (%.4f ms)", i+1, requests.length, duration / 1e6));
                     obj_map.put(req, data);
-                    Thread.sleep(3);
+                    Thread.sleep(10);
                 }
             } else {
                 abort("INVALID REQUEST TYPE", exchange);
