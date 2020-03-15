@@ -36,9 +36,9 @@ public class Adapter2 {
     public static HashSet<String> setters = null;
 
     public static void main(String[] args) {
-        System.setProperty("dmq.heartbeat-rate", "1000");
-        System.setProperty("dmq.amqp-heartbeat-rate", "1000");
-        System.setProperty("dmq.max-idle-time", "15000");
+        //System.setProperty("dmq.heartbeat-rate", "1000");
+        //System.setProperty("dmq.amqp-heartbeat-rate", "1000");
+        //System.setProperty("dmq.max-idle-time", "15000");
 
         LogInit.initializeLogs(); // debugs
 //        Logger master = Logger.getLogger("");
@@ -103,7 +103,7 @@ public class Adapter2 {
                     });
 
             logger.info(String.format("Starting cache jobs with %d entries", total_size));
-            //startReadingDaqJob(s1, "devices", 50000);
+            startReadingDaqJob(s1, "devices", 50000);
             //startReadingDaqJob(s2, "bpms", 100);
 //            for (String dev : s2) {
 //                startReadingDaqJob(new ArrayList<String>(Arrays.asList(dev)), "bpms" + dev, 100);
