@@ -70,7 +70,7 @@ public class Adapter2 {
             }
             Path filePath = new File(resource.getFile()).toPath();
             List<String> s1 = Files.readAllLines(filePath, charset).stream()
-                    .map(s -> s.split("@")[0] + "@p,1000").collect(Collectors.toList());
+                    .map(s -> s.split("@")[0] + "@p,5000").collect(Collectors.toList());
             HashSet<String> devices = new HashSet<>(s1);
 
             URL resource2 = classLoader.getResource("bpms.txt");
