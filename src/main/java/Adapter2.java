@@ -103,7 +103,7 @@ public class Adapter2 {
                     });
 
             logger.info(String.format("Starting cache jobs with %d entries", total_size));
-            startReadingDaqJob(s1, "devices", 50000);
+            //startReadingDaqJob(s1, "devices", 50000);
             //startReadingDaqJob(s2, "bpms", 100);
 //            for (String dev : s2) {
 //                startReadingDaqJob(new ArrayList<String>(Arrays.asList(dev)), "bpms" + dev, 100);
