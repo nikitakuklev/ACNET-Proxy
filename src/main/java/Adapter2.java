@@ -197,7 +197,5 @@ public class Adapter2 {
         server.setHandler(new UndertowHandler());
         server.build().start();
     }
-
-
 }
 
