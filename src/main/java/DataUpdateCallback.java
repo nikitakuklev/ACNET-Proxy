@@ -7,15 +7,17 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 class DataUpdateCallback extends TimedNumberCallback {
-
+    private static final Logger logger = Logger.getLogger(DataUpdateCallback.class.getName());
     ConcurrentHashMap<String, TimedNumber> results = DRFCache.CACHE;
     ConcurrentHashMap<String, Integer> errors;
     HashSet<String> devices;
     int num_updates = 0;
     int num_errors = 0;
     int freq;
+    long t1 = System.nanoTime();
     String name;
 
     public DataUpdateCallback(List<String> devices, String name, int freq) {
@@ -26,30 +28,40 @@ class DataUpdateCallback extends TimedNumberCallback {
         this.name = name;
     }
 
-    public void dataChanged(String var1, TimedNumber var2) {
+    public void dataChanged(String device, TimedNumber var2) {
         //System.out.println("Callback:" + var1 + "|" + var2);
         num_updates++;
         if (num_updates % this.freq == 0) {
+            double rate = num_updates / ((System.nanoTime()-t1)/1e9);
             if (var2 instanceof TimedDoubleArray){
-                System.out.println(String.format("%s | updates: %07d | errors: %05d | %s",
-                        this.name, num_updates, num_errors, Arrays.toString(Arrays.copyOfRange(((TimedDoubleArray) var2).doubleArray(), 0, 10))));
+                System.out.println(String.format("%s | upd: %07d (%.2f /s) | err: %05d | %s %s",
+                        this.name, num_updates, rate, num_errors, device,
+                        Arrays.toString(Arrays.copyOfRange(((TimedDoubleArray) var2).doubleArray(), 0, 4))));
             } else {
-                System.out.println(String.format("%s | updates: %07d | errors: %05d | %s",
-                        this.name, num_updates, num_errors, var2));
+                System.out.println(String.format("%s | upd: %07d (%.2f /s) | err: %05d | %s %s",
+                        this.name, num_updates, rate, num_errors, device, var2));
             }
         }
         if (var2 instanceof TimedError) {
-            num_errors++;
-            if (var1 != null) {
-                errors.put(var1, errors.get(var1) + 1);
+            //Note that the first received data sample will (most likely) be a <<72 1>> status message, indicating that the new request is pending.
+            int error = ((TimedError) var2).getErrorNumber();
+            int fc = ((TimedError) var2).getFacilityCode();
+            if ((fc == 72) && (error == 1)) {
+                return;
             }
-            else {
+            num_errors++;
+            if (device != null) {
+                if (errors.containsKey(device)) {
+                    errors.put(device, errors.get(device) + 1);
+                } else {
+                    errors.put(device, 1);
+                }
+            } else {
                 System.out.println("NULL Callback:" + var2);
                 return;
             }
-            int error = ((TimedError) var2).getErrorNumber();
-            int fc = ((TimedError) var2).getFacilityCode();
-            if (Adapter2.bpms.contains(var1)) {
+
+            if (Adapter3.bpms.contains(device)) {
                 if ((fc == 57) && (error == -107)) {
                     return;
                 } //MOOC_READ_TIMEOUT
@@ -59,12 +71,19 @@ class DataUpdateCallback extends TimedNumberCallback {
                 if ((fc == 68) && (error == 3)) {
                     return;
                 } //BPM_DATA_UNAVAILABLE
+            } else {
+                if ((fc == 57) && (error == -89)) {
+                    return;
+                } //MOOC_BUSY
+                if ((fc == 57) && (error == -107)) {
+                    return;
+                } //MOOC_READ_TIMEOUT
+                if ((error == -89) || (error == -107) || (error == 1) || (error == 3)) {
+                    // return; // These are common errors
+                }
             }
-            if ((error == -89) || (error == -107) || (error == 1) || (error == 3)) {
-               // return; // These are common errors
-            }
-            System.out.println("Weird error: E:" + error + " | FC:" + fc + " | "+ var2 + " | " + var1);
+            logger.warning(String.format("DataCB %s: weird error E:" + error + " | FC:" + fc + " | "+ var2 + " | " + device, this.name));
         }
-        results.put(var1, var2);
+        results.put(device, var2);
     }
 }
