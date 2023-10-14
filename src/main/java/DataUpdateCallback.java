@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
-class DataUpdateCallback extends TimedNumberCallback {
+public class DataUpdateCallback extends TimedNumberCallback {
     private static final Logger logger = Logger.getLogger(DataUpdateCallback.class.getName());
     ConcurrentHashMap<String, TimedNumber> results = DRFCache.CACHE;
     ConcurrentHashMap<String, Integer> errors;
